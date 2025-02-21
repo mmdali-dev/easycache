@@ -4,18 +4,18 @@ import (
 	"time"
 )
 
-type CacheItem struct {
-	value      string
+type CacheItem[T any] struct {
+	value      T
 	expiration int64
 }
 
-type Cache struct {
-	items map[string]CacheItem
+type Cache[T any] struct {
+	items map[string]CacheItem[T]
 }
 
-func NewSyncCache(cleanupInterval time.Duration) *Cache {
-	cache := &Cache{
-		items: make(map[string]CacheItem),
+func NewSyncCache[T any](cleanupInterval time.Duration) *Cache[T] {
+	cache := &Cache[T]{
+		items: make(map[string]CacheItem[T]),
 	}
 
 	go func() {
@@ -33,7 +33,7 @@ func NewSyncCache(cleanupInterval time.Duration) *Cache {
 	return cache
 }
 
-func (c *Cache) Set(key string, value string, ttl time.Duration) {
+func (c *Cache[T]) Set(key string, value T, ttl time.Duration) {
 	var expiration int64
 	if ttl > 0 {
 		expiration = time.Now().Add(ttl).UnixNano()
@@ -41,39 +41,41 @@ func (c *Cache) Set(key string, value string, ttl time.Duration) {
 		expiration = 0
 	}
 
-	c.items[key] = CacheItem{
+	c.items[key] = CacheItem[T]{
 		value:      value,
 		expiration: expiration,
 	}
 }
 
-func (c *Cache) GetWithCheck(key string) (string, bool) {
+func (c *Cache[T]) GetWithCheck(key string) (T, bool) {
+	var zero T
 	item, found := c.items[key]
 	if !found {
-		return "", false
+		return zero, false
 	}
 
 	if item.expiration > 0 && time.Now().UnixNano() > item.expiration {
 		delete(c.items, key)
-		return "", false
+		return zero, false
 	}
 
 	return item.value, true
 }
 
-func (c *Cache) GetWithoutCheck(key string) (string, bool) {
+func (c *Cache[T]) GetWithoutCheck(key string) (T, bool) {
+	var zero T
 	item, found := c.items[key]
 	if !found {
-		return "", false
+		return zero, false
 	}
 
 	return item.value, true
 }
 
-func (c *Cache) Delete(key string) {
+func (c *Cache[T]) Delete(key string) {
 	delete(c.items, key)
 }
 
-func (c *Cache) Clear() {
-	c.items = make(map[string]CacheItem)
+func (c *Cache[T]) Clear() {
+	c.items = make(map[string]CacheItem[T])
 }
