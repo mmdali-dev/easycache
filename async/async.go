@@ -5,24 +5,27 @@ import (
 	"time"
 )
 
-type CacheItem struct {
-	value      string
+type CacheItem[T any] struct {
+	value      T
 	expiration int64
 }
 
-type Cache struct {
+type Cache[T any] struct {
 	items sync.Map
 }
 
-func NewAsyncCache(cleanupInterval time.Duration) *Cache {
-	cache := &Cache{}
+func NewAsyncCache[T any](cleanupInterval time.Duration) *Cache[T] {
+	cache := &Cache[T]{}
 
 	go func() {
 		for {
 			time.Sleep(cleanupInterval)
 			now := time.Now().UnixNano()
 			cache.items.Range(func(key, value interface{}) bool {
-				cacheItem := value.(CacheItem)
+				cacheItem, ok := value.(CacheItem[T])
+				if !ok {
+					return true
+				}
 				if cacheItem.expiration > 0 && now > cacheItem.expiration {
 					cache.items.Delete(key)
 				}
@@ -34,7 +37,7 @@ func NewAsyncCache(cleanupInterval time.Duration) *Cache {
 	return cache
 }
 
-func (c *Cache) Set(key string, value string, ttl time.Duration) {
+func (c *Cache[T]) Set(key string, value T, ttl time.Duration) {
 	var expiration int64
 	if ttl > 0 {
 		expiration = time.Now().Add(ttl).UnixNano()
@@ -42,42 +45,55 @@ func (c *Cache) Set(key string, value string, ttl time.Duration) {
 		expiration = 0
 	}
 
-	c.items.Store(key, CacheItem{
+	c.items.Store(key, CacheItem[T]{
 		value:      value,
 		expiration: expiration,
 	})
 }
 
-func (c *Cache) GetWithCheck(key string) (string, bool) {
+func (c *Cache[T]) GetWithCheck(key string) (T, bool) {
 	item, found := c.items.Load(key)
 	if !found {
-		return "", false
+		var zero T
+		return zero, false
 	}
 
-	cacheItem := item.(CacheItem)
+	cacheItem, ok := item.(CacheItem[T])
+	if !ok {
+		var zero T
+		return zero, false
+	}
+
 	if cacheItem.expiration > 0 && time.Now().UnixNano() > cacheItem.expiration {
 		c.items.Delete(key)
-		return "", false
+		var zero T
+		return zero, false
 	}
 
 	return cacheItem.value, true
 }
 
-func (c *Cache) GetWithoutCheck(key string) (string, bool) {
+func (c *Cache[T]) GetWithoutCheck(key string) (T, bool) {
 	item, found := c.items.Load(key)
 	if !found {
-		return "", false
+		var zero T
+		return zero, false
 	}
 
-	cacheItem := item.(CacheItem)
+	cacheItem, ok := item.(CacheItem[T])
+	if !ok {
+		var zero T
+		return zero, false
+	}
+
 	return cacheItem.value, true
 }
 
-func (c *Cache) Delete(key string) {
+func (c *Cache[T]) Delete(key string) {
 	c.items.Delete(key)
 }
 
-func (c *Cache) Clear() {
+func (c *Cache[T]) Clear() {
 	c.items.Range(func(key, _ interface{}) bool {
 		c.items.Delete(key)
 		return true

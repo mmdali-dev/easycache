@@ -7,10 +7,10 @@ import (
 	"github.com/mmdali-dev/easycache/sync"
 )
 
-func NewSyncCache(cleanupInterval time.Duration) *sync.Cache {
-	return sync.NewSyncCache(cleanupInterval)
+func NewSyncCache[T any](cleanupInterval time.Duration) *sync.Cache[T] {
+	return sync.NewSyncCache[T](cleanupInterval)
 }
 
-func NewAsyncCache(cleanupInterval time.Duration) *async.Cache {
-	return async.NewAsyncCache(cleanupInterval)
+func NewAsyncCache[T any](cleanupInterval time.Duration) *async.Cache[T] {
+	return async.NewAsyncCache[T](cleanupInterval)
 }
